@@ -1,6 +1,6 @@
 check_nginx_upstream_host.pl v0.0.1
+===================================
 http://www.github.com/justino/check_nginx_upstream_host
-==============================================================================
 
 This nagios plugin is free software, and comes with ABSOLUTELY NO WARRANTY. 
 It may be used, redistributed and/or modified under the terms of the GNU 
