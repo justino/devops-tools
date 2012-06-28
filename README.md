@@ -1,5 +1,5 @@
 check_nginx_upstream_host.pl v0.0.1
-[Homepage](http://www.github.com/justino/check_nginx_upstream_host "Homepage")
+http://www.github.com/justino/check_nginx_upstream_host
 ==============================================================================
 
 This nagios plugin is free software, and comes with ABSOLUTELY NO WARRANTY. 
