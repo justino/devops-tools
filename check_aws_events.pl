@@ -68,7 +68,7 @@ sub find_aws_events {
     my $status = `ec2-describe-instance-status $instance_id | grep 'EVENT' | grep -v '\\[Completed\\]'`;
     
     ## No status, no events :)
-    return undef if ! $status;
+    return () if ! $status;
     
     ## Return an array of status (in case there are more than one
     return split /\n/, $status;
