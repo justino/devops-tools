@@ -49,6 +49,12 @@ for my $event (@events) {
 }
 $event_reason = join ', ', @event_reasons;
 
+## Add performance metrics
+$nagios->add_perfdata(
+    label   => 'events',
+    value   => scalar @event_reasons,
+);
+
 ## Time to spit out the nagios result
 if (scalar @event_reasons) {
     $nagios->nagios_exit($failure_level, $nagios->opts->message || $event_reason);
