@@ -1,0 +1,98 @@
+#!/bin/sh
+#
+# plack - this script starts plack with the specified configuration options
+#
+# chkconfig:    2345 85 15
+# description:  Plack is a PSGI middleware used to interface between Perl web 
+#               applications and web servers
+# pidfile:      /some/writable/path/app.pid
+
+################################################################################
+## Configuration Options
+################################################################################
+
+## Run as some non-privileged user
+RUN_AS=nobody
+
+## Writable location that the $RUN_AS user can write to
+## Also modify the "pidfile" chkconfig option above to match
+PID=/some/writable/path/app.pid
+
+## Location of the plackup bin, usally installed via CPAN
+BIN=/usr/bin/plackup
+
+## Mode that plack should run in
+## see http://search.cpan.org/~miyagawa/Plack-0.9986/scripts/plackup 
+## for more information
+MODE=production
+
+## See http://plackperl.org/#servers for more servers
+SERVER=Starman
+
+## Number of worker processes that should be spawned
+## This option is passed through to the chosen "server"
+WORKERS=4
+
+## Either a port or a socket
+LISTEN=/path/to/writable/location/app.sock
+
+## Path to the PSGI application you want to run
+APP=/path/to/psgi/app/app.psgi
+
+################################################################################
+
+COMMAND="$BIN -E $MODE -s $SERVER --workers=$WORKERS --listen=$LISTEN -a $APP --pid=$PID -D"
+PROG=$(basename $BIN)
+
+. /etc/rc.d/init.d/functions
+
+start() {
+	echo -n $"Starting $PROG: "
+	daemon --user=$RUN_AS $COMMAND
+	echo
+	return $?
+}
+
+stop() {
+	echo -n $"Stopping $PROG: "
+	killproc -p $PID $PROG
+	echo
+	return $?
+}
+
+reload() {
+	echo -n $"Reloading $PROG: "
+	killproc -p $PID $PROG -HUP
+	return $?
+}
+
+rh_status_q() {
+	status $PROG >/dev/null 2>&1
+}
+
+case "$1" in
+	start)
+		rh_status_q && exit 0
+		$1
+	;;
+
+	stop)
+		rh_status_q || exit 0
+		$1
+	;;
+
+	restart)
+		stop
+		start
+	;;
+
+	reload)
+		rh_status_q || exit 7
+		$1
+	;;
+
+	*)
+		echo "Usage: $0 {start|stop|restart|reload}"
+		exit 2
+	;;
+esac
