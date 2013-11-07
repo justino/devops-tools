@@ -31,7 +31,7 @@ LOG_DIR="/var/log/carbon"                                            #
 [ -f $CONFIG ] || exit 6
 [ -x $exec ] || exit 5
 
-INSTANCES=`grep '\[cache' $CONFIG | perl -ne '/cache:?([^\]]*)/ && print "$1\n"'`
+INSTANCES=`grep -e '^\[cache' $CONFIG | perl -ne '/cache:?([^\]]*)/ && print "$1\n"'`
 
 [ -e /etc/sysconfig/carbon ] && . /etc/sysconfig/carbon
 
