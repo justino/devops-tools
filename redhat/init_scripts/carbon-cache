@@ -1,0 +1,121 @@
+#!/bin/sh
+#
+# carbon-cache - init file for starting up the carbon-cache daemon(s)
+#
+# chkconfig:   - 25 75
+# description: Starts and stops the carbon-cache daemon(s).
+# processname: carbon-cache
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking config
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "$NETWORKING" = "no" ] && exit 0
+
+######################################################################
+#                      Modify only this section                      #
+######################################################################
+                                                                     #
+exec="/usr/bin/carbon-cache"                                         #
+prog=$(basename $exec)                                               #
+pidfilebase="/var/run/carbon-cache"                                  #
+lockfilebase="/var/lock/subsys/carbon-cache"                         #
+CONFIG="/etc/carbon/carbon.conf"                                     #
+LOG_DIR="/var/log/carbon"                                            #
+                                                                     #
+######################################################################
+
+[ -f $CONFIG ] || exit 6
+[ -x $exec ] || exit 5
+
+INSTANCES=`grep '\[cache' $CONFIG | perl -ne '/cache:?([^\]]*)/ && print "$1\n"'`
+
+[ -e /etc/sysconfig/carbon ] && . /etc/sysconfig/carbon
+
+start() {
+	[ ! -z $1 ] && INSTANCES=$1
+
+	while read -r instance; do
+		[ -z "$instance" ] && instance='a'
+
+		echo -n "Starting carbon-cache instance ($instance):"
+		daemon "$exec --config=$CONFIG --pidfile=$pidfilebase.$instance.pid --logdir=$LOG_DIR --instance=$instance start" > /dev/null
+
+		[[ $? -eq 0 ]] && (echo_success; touch $lockfilebase.$instance) || echo_failure
+
+		echo
+	done <<< "$INSTANCES"
+}
+
+stop() {
+	[ ! -z $1 ] && INSTANCES=$1
+
+	while read -r instance; do
+		[ -z "$instance" ] && instance='a'
+
+		echo -n "Stopping carbon-cache instance $instance"
+		killproc -p $pidfilebase.$instance.pid $prog
+
+		[[ $? -eq 0 ]] && rm -f $lockfilebase.$instance
+
+		echo
+	done <<< "$INSTANCES"
+}
+
+restart() {
+	stop $1
+	start $1
+}
+
+reload() {
+	stop $1
+	start $1
+}
+
+rh_status() {
+	[ ! -z $1 ] && INSTANCES=$1
+
+	while read -r instance; do
+		if [ -z "$instance" ]; then
+			instance='a'
+		fi
+
+		status -p $pidfilebase.$instance.pid $prog
+	done <<< "$INSTANCES"
+}
+
+rh_status_q() {
+	rh_status $1 >/dev/null 2>&1
+}
+
+case "$1" in
+	start)
+		rh_status_q && exit 0
+		$1 $2
+		;;
+	stop)
+		rh_status_q $2 || exit 0
+		$1 $2
+		;;
+	restart)
+		$1 $2
+		;;
+	reload)
+		$1 $2
+		;;
+	status)
+		rh_status $2
+		;;
+	condrestart|try-restart)
+		rh_status_q $2 || exit 0
+		restart $2
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart} [instance name]"
+		exit 2
+esac
+
+exit $?
