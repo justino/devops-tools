@@ -7,7 +7,6 @@ use File::Basename qw( basename );
 
 use Nagios::Plugin;
 use RPC::XML::Client;
-use Data::Dumper;
 
 $VERSION = 'v0.0.1';
 $PROGNAME = basename $0;
