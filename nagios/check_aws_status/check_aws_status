@@ -1,0 +1,132 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use vars qw( $PROGNAME $VERSION );
+
+use File::Basename qw( basename );
+use Nagios::Plugin;
+use XML::FeedPP;
+
+$VERSION = 'v0.0.1';
+$PROGNAME = basename $0;
+
+my $nagios = Nagios::Plugin->new(
+    version     => $VERSION,
+    plugin      => $PROGNAME,
+    usage       => '',
+    blurb       => 'Check AWS Services Health',
+    extra       => 'Written by Justin La Sotten',
+    url         => '',
+    timeout     => 15,
+);
+
+$nagios->add_arg(
+    spec     => 'url|u=s',
+    help     => "--url\n   Specify the RSS feed to parse, defaults to ALL",
+    required => 0,
+);
+
+$nagios->add_arg(
+    spec     => 'zone|z=s',
+    help     => "--zone\n   Specify zone we are interested in, will try to restrict alerts to specific zone",
+    required => 0,
+);
+
+$nagios->add_arg(
+    spec     => 'warning|w',
+    help     => "--warning\n   Issue a WARNING if service is degradated, default is CRITICAL",
+    required => 0,
+);
+
+$nagios->getopts;
+
+my $feed = fetch_feed();
+my $services = compile_service_info($feed);
+filter_unwanted_zones($services) if $nagios->opts->zone;
+exit_on_service_status($services);
+
+exit;
+
+sub compile_service_info {
+    my $feed = shift;
+    
+    my (%services);
+    for my $item ($feed->get_item) {
+        my ($status, $zone);
+        
+        ## Parse title
+        my ($preliminary_status, $service) = split /:\s/, $item->title;
+        
+        ## Check status
+        if ($preliminary_status =~ /operating\snormally/i) {
+            $status = OK;
+            ## Strip out the "resolved" tag inside the service name, if it exists
+            ## This needs to happen in order to pair problems to resolutions
+            ## from a service name perspective
+            $service =~ s/\[resolved\]\s//i;
+        }
+        elsif ($preliminary_status =~ /disruption|performance/i) {
+            $status = $nagios->opts->warning ? WARNING : CRITICAL;
+        }
+        elsif ($preliminary_status =~ /message/i) {
+            $status = WARNING;
+        }
+        else {
+            $status = UNKNOWN;
+        }
+        
+        ## Try to determine zone
+        if ($item->description =~ /([A-Z]{2}-[A-Z]+-\d+)/) {
+            $zone = $1;
+        }
+        
+        $services{$service}{'status'} = $status;
+        $services{$service}{'zone'}   = $zone if $zone;
+    }
+    
+    return \%services;
+}
+
+sub filter_unwanted_zones {
+    my $services = shift;
+    return if ! $nagios->opts->zone;
+    
+    for (keys %{$services}) {
+        ## Don't know the zone, we should still report on it
+        next if ! $services->{$_}{'zone'};
+        
+        if (lc $services->{$_}{'zone'} ne lc $nagios->opts->zone) {
+            delete $services->{$_};
+        }
+    }
+}
+
+sub fetch_feed {
+    my $url = $nagios->opts->url || 'http://status.aws.amazon.com/rss/all.rss';
+    my $feed = XML::FeedPP->new($url);
+    $feed->sort_item;
+    ## Hack to sort in reverse order (dunno why it's not an option)
+    @{$feed->{'rss'}->{'channel'}->{'item'}} = reverse @{$feed->{'rss'}->{'channel'}->{'item'}};
+    
+    return $feed;
+}
+
+sub exit_on_service_status {
+    my $services = shift;
+    
+    my $exit_code = OK;
+    my @bad_services;
+    map {
+        ## Get max exit code
+        $exit_code = $services->{$_}{'status'} > $exit_code ?  $services->{$_}{'status'} : $exit_code;
+        
+        ## Generate list of services to report on
+        my $name = $_;
+        $name = "($services->{$_}{'zone'}) $name" if $services->{$_}{'zone'};
+        push @bad_services, $name if $services->{$_}{'status'} > OK;
+    } keys %{$services};
+    
+    $nagios->nagios_exit($exit_code, join(', ', @bad_services) || 'AWS Health Services Look Good');
+}
+
