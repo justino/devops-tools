@@ -14,7 +14,7 @@ if ($state && $state =~ /CRITICAL|WARNING/ && $type && $type eq 'SOFT' && $attem
     
     for my $signal (@signals) {
         my $pid = get_pid();
-        next if $pid = $$;
+        next if $pid == $$;
         last if ! is_process_running($pid);
         
         kill $signal, $pid if $pid;
