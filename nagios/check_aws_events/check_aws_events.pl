@@ -7,9 +7,7 @@ use vars qw( $PROGNAME $VERSION );
 use Nagios::Plugin;
 use File::Basename qw( basename );
 
-use Data::Dumper;
-
-$VERSION = 'v0.0.1';
+$VERSION = 'v0.0.2';
 $PROGNAME = basename $0;
 
 my $nagios = Nagios::Plugin->new(
@@ -76,7 +74,7 @@ sub find_aws_events {
     ## No status, no events :)
     return () if ! $status;
     
-    ## Return an array of status (in case there are more than one
+    ## Return an array of status (in case there are more than one)
     return split /\n/, $status;
 }
 
@@ -86,6 +84,9 @@ sub format_event {
     ## Event format example
     ## EVENT	system-maintenance	2013-08-06T07:00:00+0000	2013-08-06T11:00:00+0000	Your instance network connections will be restarted during this window.
     my @fields = split /\t/, $event;
+    my $date = $fields[2];
+    $date =~ s/T/ /;
+    $date =~ s/\+\d+//;
     
-    return "[$fields[1]] $fields[4]";
+    return "[$fields[1] - $date] $fields[4]";
 }
